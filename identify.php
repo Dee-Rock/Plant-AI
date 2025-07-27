@@ -1,5 +1,10 @@
 <?php
-session_start();
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Include database configuration
 require_once 'config.php';
 
 // Set error reporting for debugging
@@ -13,14 +18,22 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
 // Initialize variables
 $error = '';
+$plant = null;
 
 // Function to make API request to Plant.id
 function identifyPlant($imagePath) {
-    $apiKey = $_ENV['PLANT_ID_API_KEY'] ?? '';
+    global $config;
+    $apiKey = $config['plant_id_api_key'] ?? '';
     if (empty($apiKey)) {
-        return ['error' => 'API key not configured'];
+        return ['error' => 'Plant.id API key not configured. Please contact the administrator.'];
     }
 
     // Check if file exists
@@ -113,17 +126,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     // Save to database
                     try {
-                        $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
-                        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                        // Use the existing PDO connection from config.php
+                        global $pdo;
                         
                         $plantName = $result['suggestions'][0]['plant_name'] ?? 'Unknown Plant';
                         
-                        $stmt = $pdo->prepare("INSERT INTO identifications (user_id, image_path, plant_name, result_json, created_at) VALUES (?, ?, ?, ?, NOW())");
+                        // First, make sure the plant exists in the plants table or insert it
+                        $stmt = $pdo->prepare("INSERT IGNORE INTO plants (common_name, scientific_name) VALUES (?, ?)");
+                        $stmt->execute([$plantName, $result['suggestions'][0]['scientific_name'] ?? '']);
+                        
+                        // Get the plant ID
+                        $plantId = $pdo->lastInsertId() ?: $pdo->query("SELECT id FROM plants WHERE common_name = " . $pdo->quote($plantName) . " LIMIT 1")->fetchColumn();
+                        
+                        // Insert into plant_identifications
+                        $stmt = $pdo->prepare("INSERT INTO plant_identifications (user_id, plant_id, image_path, confidence, identified_at) VALUES (?, ?, ?, ?, NOW())");
                         $stmt->execute([
                             $_SESSION['user_id'],
+                            $plantId ?: null,
                             $targetPath,
-                            $plantName,
-                            json_encode($result)
+                            $result['suggestions'][0]['probability'] ?? null
                         ]);
                         
                         $identificationId = $pdo->lastInsertId();
@@ -320,156 +341,96 @@ document.getElementById('plantImage').addEventListener('change', function(e) {
 // Include footer
 include 'includes/footer.php';
 ?>
-    // Get image URLs
-    $urls = [];
-    foreach ($images as $imgTitle) {
-        $imgInfoUrl = 'https://en.wikipedia.org/w/api.php?action=query&titles=' . urlencode($imgTitle) . '&prop=imageinfo&iiprop=url&format=json&origin=*';
-        $imgInfoResp = curl_get($imgInfoUrl);
-        if ($imgInfoResp !== false) {
-            $imgInfoData = json_decode($imgInfoResp, true);
-            foreach ($imgInfoData['query']['pages'] as $imgPage) {
-                if (isset($imgPage['imageinfo'][0]['url'])) {
-                    $urls[] = $imgPage['imageinfo'][0]['url'];
-                }
-            }
-        }
-    }
-    return $urls;
-}
-
-function getCurrentDateTime() {
-    return date('Y-m-d H:i');
-}
-if (isset($_GET['download_pdf']) && isset($_GET['id'])) {
-    require_once('fpdf/fpdf.php');
-    require_once 'config.php';
-    $stmt = $pdo->prepare('SELECT * FROM identifications WHERE id = ?');
-    $stmt->execute([$_GET['id']]);
-    $row = $stmt->fetch();
-    if ($row) {
-        $plant = json_decode($row['result_json'], true);
-        $pdf = new FPDF();
-        $pdf->AddPage();
-        $pdf->SetFont('Arial','B',16);
-        $pdf->Cell(0,10,'Plant Identification Result',0,1,'C');
-        $pdf->SetFont('Arial','',12);
-        $pdf->Ln(5);
-        if (file_exists($row['image_path'])) {
-            $pdf->Image($row['image_path'],null,null,60,60);
-            $pdf->Ln(65);
-        }
-        $pdf->Cell(0,10,'Plant Name: ' . ($plant['plant_name'] ?? 'Unknown'),0,1);
-        $pdf->Cell(0,10,'Scientific Name: ' . ($plant['plant_details']['scientific_name'] ?? 'Unknown'),0,1);
-        $pdf->Cell(0,10,'Identified At: ' . $row['identified_at'],0,1);
-        if (!empty($plant['plant_details']['common_names']))
-            $pdf->MultiCell(0,8,'Common Names: ' . implode(', ', $plant['plant_details']['common_names']));
-        if (!empty($plant['plant_details']['wiki_description']['value']))
-            $pdf->MultiCell(0,8,'Description: ' . $plant['plant_details']['wiki_description']['value']);
-        if (!empty($plant['plant_details']['watering']))
-            $pdf->MultiCell(0,8,'Watering: ' . implode(', ', $plant['plant_details']['watering']));
-        if (!empty($plant['plant_details']['sunlight']))
-            $pdf->MultiCell(0,8,'Sunlight: ' . implode(', ', $plant['plant_details']['sunlight']));
-        if (!empty($plant['plant_details']['toxicity']))
-            $pdf->MultiCell(0,8,'Toxicity: ' . implode(', ', $plant['plant_details']['toxicity']));
-        if (!empty($plant['plant_details']['propagation_methods']))
-            $pdf->MultiCell(0,8,'Propagation Methods: ' . implode(', ', $plant['plant_details']['propagation_methods']));
-        if (!empty($plant['plant_details']['edible_parts']))
-            $pdf->MultiCell(0,8,'Edible Parts: ' . implode(', ', $plant['plant_details']['edible_parts']));
-        $pdf->Output('D','plant_identification.pdf');
-        exit;
-    }
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['plant_image'])) {
-    $file = $_FILES['plant_image'];
-    if ($file['error'] === UPLOAD_ERR_OK) {
-        $tmpName = $file['tmp_name'];
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $allowed = ['jpg', 'jpeg', 'png'];
-        if (!in_array($ext, $allowed)) {
-            header('Location: index.php?error=Only JPG, JPEG, PNG allowed');
-            exit;
-        }
-        // Save uploaded image to uploads/ directory
-        $uploadsDir = 'uploads/';
-        if (!is_dir($uploadsDir)) {
-            mkdir($uploadsDir, 0777, true);
-        }
-        $uniqueName = 'plant_' . uniqid() . '.' . $ext;
-        $destPath = $uploadsDir . $uniqueName;
-        move_uploaded_file($tmpName, $destPath);
-        // Call Plant.id API
-        $result = callPlantIdAPI($destPath);
-        file_put_contents('plantid_debug.json', json_encode($result, JSON_PRETTY_PRINT));
-        if (isset($result['error'])) {
-            $error = $result['error'];
-        } elseif (!empty($result['suggestions'])) {
-            $plant = $result['suggestions'][0]; // Only the top suggestion
-            // Save identification to database
-            $userId = $_SESSION['user_id'] ?? null;
-            $stmt = $pdo->prepare('INSERT INTO identifications (user_id, image_path, plant_name, scientific_name, result_json) VALUES (?, ?, ?, ?, ?)');
-            $stmt->execute([
-                $userId,
-                $destPath,
-                $plant['plant_name'] ?? '',
-                $plant['plant_details']['scientific_name'] ?? '',
-                json_encode($plant)
-            ]);
-        } else {
-            $error = 'No plant identified.';
-        }
-    } else {
-        $error = 'File upload error.';
-    }
-} elseif ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['wiki']) && isset($_GET['name'])) {
-    // AJAX handler for Wikipedia summary
-    header('Content-Type: application/json');
-    $summary = fetchWikipediaSummary($_GET['name']);
-    echo json_encode(['summary' => $summary]);
-    exit;
-} else {
-    header('Location: index.php?error=No file uploaded');
-    exit;
-}
-
-// After saving identification, get its ID for comments
-if (isset($stmt) && $stmt instanceof PDOStatement && empty($error)) {
-    $identification_id = $pdo->lastInsertId();
-} elseif (isset($row['id'])) {
-    $identification_id = $row['id'];
-} else {
-    $identification_id = null;
-}
-// Handle new comment
-$comment_message = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['comment'])) {
-    if (!isset($_SESSION['user_id'])) {
-        $comment_message = 'You must be logged in to comment.';
-    } else {
-        $comment = trim($_POST['comment']);
-        if ($comment && $identification_id) {
-            $stmt = $pdo->prepare('INSERT INTO comments (identification_id, user_id, comment) VALUES (?, ?, ?)');
-            $stmt->execute([$identification_id, $_SESSION['user_id'], $comment]);
-        } else {
-            $comment_message = 'Comment cannot be empty.';
-        }
-    }
-}
-// Fetch comments for this identification
-$comments = [];
-if ($identification_id) {
-    $stmt = $pdo->prepare('SELECT c.*, u.username FROM comments c JOIN user u ON c.user_id = u.id WHERE c.identification_id = ? ORDER BY c.created_at DESC');
-    $stmt->execute([$identification_id]);
-    $comments = $stmt->fetchAll();
-}
+   
+<?php
+// Include header
+include 'includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plant Identification Result</title>
-    <link rel="stylesheet" href="style.css">
+
+<div class="container">
+    <h1><i class="fas fa-search"></i> Identify a Plant</h1>
+    
+    <?php if (!empty($error)): ?>
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($error) ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (isset($plant)): ?>
+        <div class="card mt-4">
+            <div class="card-header">
+                <h2>Identification Results</h2>
+            </div>
+            <div class="card-body">
+                <?php if (isset($plant['error'])): ?>
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> <?= htmlspecialchars($plant['error']) ?>
+                    </div>
+                <?php else: ?>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <?php if (!empty($plant['images'][0])): ?>
+                                <img src="<?= htmlspecialchars($plant['images'][0]) ?>" class="img-fluid rounded" alt="Uploaded plant">
+                            <?php endif; ?>
+                        </div>
+                        <div class="col-md-6">
+                            <h3><?= htmlspecialchars($plant['plant_name'] ?? 'Unknown Plant') ?></h3>
+                            <?php if (!empty($plant['plant_details']['common_names'])): ?>
+                                <p><strong>Common Names:</strong> <?= htmlspecialchars(implode(', ', $plant['plant_details']['common_names'])) ?></p>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($plant['plant_details']['scientific_name'])): ?>
+                                <p><strong>Scientific Name:</strong> <em><?= htmlspecialchars($plant['plant_details']['scientific_name']) ?></em></p>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($plant['plant_details']['wiki_description'])): ?>
+                                <div class="mt-3">
+                                    <h5>Description:</h5>
+                                    <p><?= nl2br(htmlspecialchars($plant['plant_details']['wiki_description'])) ?></p>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($plant['plant_details']['watering'])): ?>
+                                <div class="mt-3">
+                                    <h5>Watering:</h5>
+                                    <p><?= nl2br(htmlspecialchars($plant['plant_details']['watering'])) ?></p>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($plant['plant_details']['sunlight'])): ?>
+                                <div class="mt-3">
+                                    <h5>Sunlight:</h5>
+                                    <p><?= nl2br(htmlspecialchars($plant['plant_details']['sunlight'])) ?></p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+    
+    <div class="card mt-4">
+        <div class="card-body">
+            <h2>Identify a New Plant</h2>
+            <form action="identify.php" method="post" enctype="multipart/form-data" class="mt-4">
+                <div class="form-group">
+                    <label for="plant_image">Upload Plant Image:</label>
+                    <input type="file" class="form-control-file" id="plant_image" name="plant_image" accept="image/*" required>
+                    <small class="form-text text-muted">Supported formats: JPG, PNG, JPEG</small>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">
+                    <i class="fas fa-search"></i> Identify Plant
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<?php
+// Include footer
+include 'includes/footer.php';
+?>
     <script>
     function fetchWikiDescription(scientificName, btn) {
         btn.disabled = true;
@@ -563,23 +524,7 @@ if ($identification_id) {
     </script>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-content">
-            <div class="navbar-title">Plant AI</div>
-            <div class="navbar-links">
-                <a href="index.php" class="nav-link">Home</a>
-                <a href="gallery.php" class="gallery-link">History</a>
-                <a href="disease_detect.php" class="nav-link">Disease Detection</a>
-                <?php if (isset($_SESSION['user_id'])): ?>
-                    <a href="profile.php" class="nav-link">Profile</a>
-                    <a href="logout.php" class="nav-link">Logout</a>
-                <?php else: ?>
-                    <a href="login.php" class="nav-link">Login</a>
-                    <a href="register.php" class="nav-link">Register</a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </nav>
+ 
     <div class="container">
         <h2>Plant Identification Results</h2>
         <?php if (isset($error)): ?>

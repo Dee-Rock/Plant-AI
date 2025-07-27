@@ -45,9 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['email'] = $user['email'];
                 
-                // Update last login time
-                $updateStmt = $pdo->prepare('UPDATE users SET last_login = NOW() WHERE id = ?');
-                $updateStmt->execute([$user['id']]);
+                // Login successful - no need to update last_login as the column doesn't exist
                 
                 // Redirect to dashboard or home page
                 header('Location: index.php');
