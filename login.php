@@ -1,9 +1,20 @@
 <?php
+// Enable error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Start session
 session_start();
 
 // Include database configuration
 require_once 'config.php';
+
+// Test database connection
+try {
+    $pdo->query('SELECT 1');
+} catch (PDOException $e) {
+    die('Database connection failed: ' . $e->getMessage() . '. Check your config.php settings.');
+}
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
@@ -24,11 +35,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             // Check user credentials
-            $stmt = $pdo->prepare('SELECT id, username, password_hash, email FROM users WHERE username = ? OR email = ? LIMIT 1');
+            $stmt = $pdo->prepare('SELECT id, username, password, email FROM users WHERE username = ? OR email = ? LIMIT 1');
             $stmt->execute([$username, $username]);
             $user = $stmt->fetch();
             
-            if ($user && password_verify($password, $user['password_hash'])) {
+            if ($user && password_verify($password, $user['password'])) {
                 // Login successful
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
@@ -46,7 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (PDOException $e) {
             error_log('Login error: ' . $e->getMessage());
-            $error = 'An error occurred. Please try again later.';
+            $error = 'Login error: ' . $e->getMessage();
+            // For debugging - remove in production
+            $error .= '<br>Query: ' . $stmt->queryString;
+            $error .= '<br>Params: ' . print_r([$username, $username], true);
         }
     }
 }
@@ -113,6 +127,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: #d32f2f;
             margin-bottom: 15px;
             text-align: center;
+            padding: 10px;
+            background-color: #ffebee;
+            border-radius: 4px;
+        }
+        .success {
+            color: #2e7d32;
+            margin-bottom: 15px;
+            text-align: center;
+            padding: 10px;
+            background-color: #e8f5e9;
+            border-radius: 4px;
         }
         .register-link {
             text-align: center;
@@ -124,8 +149,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="login-container">
         <h2>Login to Plant AI</h2>
         
-        <?php if ($error): ?>
-            <div class="error"><?php echo htmlspecialchars($error); ?></div>
+        <?php if (isset($_GET['registered']) && $_GET['registered'] == 1): ?>
+            <div class="success">Registration successful! Please log in.</div>
+        <?php endif; ?>
+        
+        <?php if (isset($error)): ?>
+            <div class="error"><?php echo $error; ?></div>
         <?php endif; ?>
         
         <form method="post" action="">

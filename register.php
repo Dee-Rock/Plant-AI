@@ -1,9 +1,20 @@
 <?php
+// Enable error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Start session
 session_start();
 
 // Include database configuration
 require_once 'config.php';
+
+// Test database connection
+try {
+    $pdo->query('SELECT 1');
+} catch (PDOException $e) {
+    die('Database connection failed: ' . $e->getMessage() . '. Check your config.php settings.');
+}
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
@@ -63,8 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Hash password
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
                 
-                // Insert new user
-                $stmt = $pdo->prepare('INSERT INTO users (username, email, password_hash, full_name, created_at) VALUES (?, ?, ?, ?, NOW())');
+                // Insert new user - using 'password' column to match database schema
+                $stmt = $pdo->prepare('INSERT INTO users (username, email, password, full_name, created_at) VALUES (?, ?, ?, ?, NOW())');
                 $result = $stmt->execute([
                     $formData['username'],
                     $formData['email'],
@@ -83,7 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         } catch (PDOException $e) {
             error_log('Registration error: ' . $e->getMessage());
-            $errors['general'] = 'An error occurred. Please try again later.';
+            $errors['general'] = 'Error: ' . $e->getMessage();
+            // For debugging - remove in production
+            $errors['debug'] = 'Query: ' . $stmt->queryString . '<br>';
+            $errors['debug'] .= 'Params: ' . print_r([
+                'username' => $formData['username'],
+                'email' => $formData['email'],
+                'full_name' => !empty($formData['full_name']) ? $formData['full_name'] : null
+            ], true);
         }
     }
 }
