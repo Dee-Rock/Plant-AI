@@ -54,18 +54,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['plant_image'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plant Disease Detection</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="assets/css/sidebar.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-content">
-            <div class="navbar-title">Plant AI</div>
-            <div class="navbar-links">
-                <a href="index.php" class="nav-link">Home</a>
-                <a href="gallery.php" class="gallery-link">History</a>
-                <a href="disease_detect.php" class="nav-link">Disease Detection</a>
-            </div>
-        </div>
-    </nav>
+    <?php include 'includes/sidebar.php'; ?>
+    <div class="main-content">
     <div class="container">
         <h2>Plant Disease Detection</h2>
         <?php if ($message): ?><div class="message error"><?= $message ?></div><?php endif; ?>
@@ -84,5 +78,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['plant_image'])) {
             </div>
         <?php endif; ?>
     </div>
+    <script>
+    // Wait for the DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebar');
+        const toggle = document.getElementById('sidebarToggle');
+        const main = document.querySelector('.main-content');
+        
+        // Make sure the sidebar is visible and positioned correctly
+        if (sidebar) {
+            sidebar.style.display = 'block';
+            sidebar.style.left = '-250px'; // Start off-screen
+        }
+        
+        if (toggle && sidebar && main) {
+            // Toggle sidebar when button is clicked
+            toggle.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (sidebar.style.left === '0px') {
+                    sidebar.style.left = '-250px';
+                    main.classList.remove('shift-right');
+                } else {
+                    sidebar.style.left = '0';
+                    main.classList.add('shift-right');
+                }
+                return false;
+            };
+            
+            // Close sidebar when clicking outside
+            document.addEventListener('click', function(e) {
+                if (e.target !== toggle && !sidebar.contains(e.target)) {
+                    sidebar.style.left = '-250px';
+                    main.classList.remove('shift-right');
+                }
+            });
+        }
+    });
+    </script>
 </body>
 </html> 

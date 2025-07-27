@@ -9,24 +9,20 @@ require_once 'env.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Plant Identifier</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="assets/css/sidebar.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-content">
-            <div class="navbar-title">Plant AI</div>
-            <div class="navbar-links">
-                <a href="gallery.php" class="gallery-link">View Identification History</a>
-                <a href="disease_detect.php" class="nav-link">Disease Detection</a>
-                <?php if (isset($_SESSION['user_id'])): ?>
-                    <a href="profile.php" class="nav-link">Profile</a>
-                    <a href="logout.php" class="nav-link">Logout</a>
-                <?php else: ?>
-                    <a href="login.php" class="nav-link">Login</a>
-                    <a href="register.php" class="nav-link">Register</a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </nav>
+    <?php 
+    echo '<!-- Including sidebar from: ' . __DIR__ . '/includes/sidebar.php -->';
+    if (file_exists(__DIR__ . '/includes/sidebar.php')) {
+        include 'includes/sidebar.php';
+        echo '<!-- Sidebar included successfully -->';
+    } else {
+        echo '<!-- Error: Sidebar file not found -->';
+    }
+    ?>
+    <div class="main-content">
     <div class="container">
         <h2>AI Plant Identifier</h2>
         <form action="identify.php" method="post" enctype="multipart/form-data">
@@ -37,8 +33,6 @@ require_once 'env.php';
             <div class="message error"><?= htmlspecialchars($_GET['error']) ?></div>
         <?php endif; ?>
         <div class="main-links">
-            <!-- <a href="gallery.php">Identification History</a> -->
-            <!-- <a href="disease_detect.php">Plant Disease Detection</a> -->
             <a href="comments.php" style="background:#ffb347; color:#333;">Community Comments</a>
             <?php if (isset($_SESSION['user_id'])): ?>
                 <a href="profile.php">Your Profile</a>
@@ -49,5 +43,44 @@ require_once 'env.php';
             <a href="identification.php?id=1">Sample Identification Detail</a>
         </div>
     </div>
+    <script>
+    // Wait for the DOM to be fully loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        const sidebar = document.getElementById('sidebar');
+        const toggle = document.getElementById('sidebarToggle');
+        const main = document.querySelector('.main-content');
+        
+        // Make sure the sidebar is visible and positioned correctly
+        if (sidebar) {
+            sidebar.style.display = 'block';
+            sidebar.style.left = '-250px'; // Start off-screen
+        }
+        
+        if (toggle && sidebar && main) {
+            // Toggle sidebar when button is clicked
+            toggle.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (sidebar.style.left === '0px') {
+                    sidebar.style.left = '-250px';
+                    main.classList.remove('shift-right');
+                } else {
+                    sidebar.style.left = '0';
+                    main.classList.add('shift-right');
+                }
+                return false;
+            };
+            
+            // Close sidebar when clicking outside
+            document.addEventListener('click', function(e) {
+                if (e.target !== toggle && !sidebar.contains(e.target)) {
+                    sidebar.style.left = '-250px';
+                    main.classList.remove('shift-right');
+                }
+            });
+        }
+    });
+    </script>
 </body>
-</html> 
+</html>

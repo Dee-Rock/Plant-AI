@@ -8,16 +8,21 @@ $current_page = basename($_SERVER['PHP_SELF']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plant AI - Smart Plant Care Assistant</title>
-    <link rel="stylesheet" href="/Plant-AI/assets/css/style.css">
+    <link rel="stylesheet" href="/Plant-AI/style.css">
+    <link rel="stylesheet" href="/Plant-AI/assets/css/sidebar.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <!-- Include Sidebar -->
+    <?php include 'sidebar.php'; ?>
+    
+    <div class="main-content">
     <header>
         <div class="container">
             <div class="header-content">
-                <a href="/Plant-AI/index.php" class="logo">
+                <h1 class="logo">
                     <i class="fas fa-leaf"></i> Plant AI
-                </a>
+                </h1>
                 <nav>
                     <ul style="display: flex; list-style: none; gap: 1.5rem;">
                         <li><a href="/Plant-AI/index.php" class="<?php echo $current_page === 'index.php' ? 'active' : ''; ?>">Home</a></li>

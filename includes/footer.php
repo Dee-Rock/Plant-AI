@@ -1,4 +1,5 @@
     </main>
+    
     <footer style="background-color: #2e7d32; color: white; padding: 2rem 0; margin-top: 3rem;">
         <div class="container" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2rem;">
             <div class="footer-section">
@@ -43,5 +44,6 @@
             });
         });
     </script>
+</div> <!-- Close .main-content -->
 </body>
 </html>

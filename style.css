@@ -1,9 +1,38 @@
 body {
-    background: linear-gradient(120deg, #a8edea 0%, #fed6e3 100%);
+    background: linear-gradient(rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.5)), 
+                url('https://images.unsplash.com/photo-1534710961216-75c88202f43d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80') no-repeat center center fixed;
+    background-size: cover;
     font-family: 'Segoe UI', Arial, sans-serif;
     margin: 0;
     padding: 0;
     min-height: 100vh;
+    position: relative;
+    transition: all 0.3s;
+    overflow-x: hidden;
+}
+
+/* Main content styles */
+.main-content {
+    margin-left: 250px;
+    padding: 30px;
+    min-height: 100vh;
+    box-sizing: border-box;
+    transition: margin-left 0.3s ease-in-out;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 10px 0 0 0;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* When sidebar is closed */
+.main-content.shift-right {
+    margin-left: 0;
+}
+
+/* Ensure content is not hidden behind sidebar */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
 }
 nav.navbar {
     width: 100%;
@@ -60,14 +89,15 @@ nav.navbar {
     color: #2193b0;
 }
 .container {
-    background: #fff;
+    background: rgba(255, 255, 255, 0.9);
     padding: 2.5rem 2rem;
     border-radius: 1.2rem;
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.2);
-    max-width: 400px;
-    width: 100%;
+    max-width: 800px;
+    width: 90%;
     text-align: center;
-    margin: 5.5rem auto 2rem auto;
+    margin: 2rem auto;
+    transition: all 0.3s;
 }
 @media (max-width: 600px) {
     .navbar-content {
