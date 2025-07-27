@@ -82,5 +82,32 @@ require_once 'env.php';
         }
     });
     </script>
-</body>
-</html>
+    
+    <!-- Include Footer -->
+    <?php include 'includes/footer_include.php'; ?>
+    
+    <script>
+    // Make sure footer is at the bottom of the page
+    document.addEventListener('DOMContentLoaded', function() {
+        const body = document.body;
+        const footer = document.querySelector('footer');
+        
+        function adjustFooter() {
+            const bodyHeight = body.offsetHeight;
+            const windowHeight = window.innerHeight;
+            
+            if (bodyHeight < windowHeight && footer) {
+                footer.style.position = 'fixed';
+                footer.style.bottom = '0';
+                footer.style.left = '0';
+                footer.style.right = '0';
+            } else if (footer) {
+                footer.style.position = 'relative';
+            }
+        }
+        
+        // Run on load and on resize
+        adjustFooter();
+        window.addEventListener('resize', adjustFooter);
+    });
+    </script>

@@ -82,6 +82,7 @@ $identifications = $stmt->fetchAll();
     <title>Identification History</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="assets/css/sidebar.css">
+    <link rel="stylesheet" href="assets/css/footer.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         .gallery { 
@@ -262,7 +263,32 @@ $identifications = $stmt->fetchAll();
             // Initialize sidebar as open by default
             openSidebar();
         });
+        
+        // Make sure footer is at the bottom of the page
+        document.addEventListener('DOMContentLoaded', function() {
+            const body = document.body;
+            const footer = document.querySelector('footer');
+            
+            function adjustFooter() {
+                const bodyHeight = body.offsetHeight;
+                const windowHeight = window.innerHeight;
+                
+                if (bodyHeight < windowHeight && footer) {
+                    footer.style.position = 'fixed';
+                    footer.style.bottom = '0';
+                    footer.style.left = '0';
+                    footer.style.right = '0';
+                } else if (footer) {
+                    footer.style.position = 'relative';
+                }
+            }
+            
+            // Run on load and on resize
+            adjustFooter();
+            window.addEventListener('resize', adjustFooter);
+        });
         </script>
-    </div>
-</body>
-</html>
+    </div> <!-- Close .main-content -->
+    
+    <!-- Include Footer -->
+    <?php include 'includes/footer_include.php'; ?>
