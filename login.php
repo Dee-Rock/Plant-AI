@@ -1,24 +1,53 @@
 <?php
-require_once 'config.php';
+// Start session
 session_start();
-$message = '';
+
+// Include database configuration
+require_once 'config.php';
+
+// Redirect if already logged in
+if (isset($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit();
+}
+
+$error = '';
+$username = '';
+
+// Process login form
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
-    if ($username && $password) {
-        $stmt = $pdo->prepare('SELECT * FROM user WHERE username = ?');
-        $stmt->execute([$username]);
-        $user = $stmt->fetch();
-        if ($user && password_verify($password, $user['password'])) {
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            header('Location: index.php');
-            exit;
-        } else {
-            $message = 'Invalid username or password.';
-        }
+    
+    if (empty($username) || empty($password)) {
+        $error = 'Please enter both username and password.';
     } else {
-        $message = 'Please fill in all fields.';
+        try {
+            // Check user credentials
+            $stmt = $pdo->prepare('SELECT id, username, password_hash, email FROM users WHERE username = ? OR email = ? LIMIT 1');
+            $stmt->execute([$username, $username]);
+            $user = $stmt->fetch();
+            
+            if ($user && password_verify($password, $user['password_hash'])) {
+                // Login successful
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['email'] = $user['email'];
+                
+                // Update last login time
+                $updateStmt = $pdo->prepare('UPDATE users SET last_login = NOW() WHERE id = ?');
+                $updateStmt->execute([$user['id']]);
+                
+                // Redirect to dashboard or home page
+                header('Location: index.php');
+                exit();
+            } else {
+                $error = 'Invalid username/email or password.';
+            }
+        } catch (PDOException $e) {
+            error_log('Login error: ' . $e->getMessage());
+            $error = 'An error occurred. Please try again later.';
+        }
     }
 }
 ?>
@@ -28,94 +57,96 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Plant AI</title>
-    <link rel="stylesheet" href="style.css">
     <style>
         body {
-            background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)), url('assets/images/plant-bg.jpg') no-repeat center center fixed;
-            background-size: cover;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            margin: 0;
-            padding: 20px;
         }
         .login-container {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
             width: 100%;
             max-width: 400px;
-            text-align: center;
         }
         .login-container h2 {
-            margin-bottom: 1.5rem;
+            text-align: center;
             color: #2e7d32;
+            margin-bottom: 20px;
         }
-        .login-container input {
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input {
             width: 100%;
-            padding: 12px;
-            margin: 8px 0;
+            padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
-            font-size: 16px;
+            box-sizing: border-box;
         }
-        .login-container button {
+        .form-group button {
             width: 100%;
-            padding: 12px;
-            margin: 15px 0;
+            padding: 10px;
             background-color: #2e7d32;
             color: white;
             border: none;
             border-radius: 4px;
-            font-size: 16px;
             cursor: pointer;
-            transition: background-color 0.3s;
+            font-size: 16px;
         }
-        .login-container button:hover {
+        .form-group button:hover {
             background-color: #1b5e20;
         }
-        .login-links {
-            margin-top: 1rem;
-            font-size: 14px;
+        .error {
+            color: #d32f2f;
+            margin-bottom: 15px;
+            text-align: center;
         }
-        .login-links a {
-            color: #2e7d32;
-            text-decoration: none;
-            margin: 0 5px;
-        }
-        .login-links a:hover {
-            text-decoration: underline;
-        }
-        .logo {
-            max-width: 150px;
-            margin-bottom: 1.5rem;
-        }
-        .message {
-            background-color: #ffebee;
-            color: #c62828;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-            font-size: 14px;
+        .register-link {
+            text-align: center;
+            margin-top: 15px;
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <img src="assets/images/logo.png" alt="Plant AI Logo" class="logo">
-        <h2>Welcome Back</h2>
-        <?php if ($message): ?><div class="message"><?= $message ?></div><?php endif; ?>
-        <form method="post">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <button type="submit">Sign In</button>
+        <h2>Login to Plant AI</h2>
+        
+        <?php if ($error): ?>
+            <div class="error"><?php echo htmlspecialchars($error); ?></div>
+        <?php endif; ?>
+        
+        <form method="post" action="">
+            <div class="form-group">
+                <label for="username">Username or Email</label>
+                <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($username); ?>" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit">Login</button>
+            </div>
+            
+            <div class="register-link">
+                Don't have an account? <a href="register.php">Register here</a>
+            </div>
         </form>
-        <div class="login-links">
-            <a href="register.php">Create Account</a> | 
-            <a href="reset_request.php">Forgot Password?</a>
-        </div>
     </div>
 </body>
 </html>

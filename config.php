@@ -1,9 +1,9 @@
 <?php
 // Database configuration
 $host = 'localhost';
-$db   = 'ppa'; // Change this to your DB name
-$user = 'rockz';     // Change this to your DB user
-$pass = 'rock12';     // Change this to your DB password
+$db   = 'plantapp'; // Change this to your DB name
+$user = 'Del';     // Change this to your DB user
+$pass = 'RockZ@12';     // Change this to your DB password
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
