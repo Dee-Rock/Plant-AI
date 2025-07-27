@@ -1,83 +1,325 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-ini_set('max_execution_time', 90);
-require_once 'env.php';
+session_start();
 require_once 'config.php';
 
-function curl_post_json($url, $data, $headers = [], $timeout = 20) {
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_POST, 1);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // TEMPORARY: Disable SSL verification
-    $response = curl_exec($ch);
-    if ($response === false) {
-        $error = curl_error($ch);
-        file_put_contents('plantid_curl_error.txt', $error);
-    }
-    curl_close($ch);
-    return $response;
+// Set error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('max_execution_time', 90);
+
+// Check if user is logged in
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
 }
 
-function curl_get($url, $timeout = 20) {
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // TEMPORARY: Disable SSL verification
-    $response = curl_exec($ch);
-    curl_close($ch);
-    return $response;
-}
+// Initialize variables
+$error = '';
 
-function callPlantIdAPI($imagePath) {
+// Function to make API request to Plant.id
+function identifyPlant($imagePath) {
     $apiKey = $_ENV['PLANT_ID_API_KEY'] ?? '';
-    if (!$apiKey) return ['error' => 'API key not set.'];
-    $url = 'https://api.plant.id/v2/identify';
+    if (empty($apiKey)) {
+        return ['error' => 'API key not configured'];
+    }
+
+    // Check if file exists
+    if (!file_exists($imagePath)) {
+        return ['error' => 'Image file not found'];
+    }
+
+    // Prepare image data
     $imageData = base64_encode(file_get_contents($imagePath));
+    
+    $url = 'https://api.plant.id/v2/identify';
     $data = [
         'images' => [$imageData],
         'organs' => ['leaf', 'flower', 'fruit', 'bark'],
-        'details' => ['common_names', 'url', 'name_authority', 'wiki_description', 'taxonomy', 'synonyms', 'edible_parts', 'propagation_methods', 'watering', 'sunlight', 'toxicity'],
+        'details' => [
+            'common_names',
+            'url',
+            'wiki_description',
+            'taxonomy',
+            'watering',
+            'sunlight',
+            'toxicity'
+        ],
     ];
+    
     $headers = [
-        'Content-type: application/json',
+        'Content-Type: application/json',
         'Api-Key: ' . $apiKey
     ];
-    $result = curl_post_json($url, $data, $headers);
-    return json_decode($result, true);
+    
+    // Initialize cURL
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_POSTFIELDS => json_encode($data),
+        CURLOPT_SSL_VERIFYPEER => false
+    ]);
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    if ($error) {
+        return ['error' => 'API request failed: ' . $error];
+    }
+    
+    $result = json_decode($response, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return ['error' => 'Invalid API response'];
+    }
+    
+    if ($httpCode !== 200) {
+        return ['error' => 'API error: ' . ($result['message'] ?? 'Unknown error')];
+    }
+    
+    return $result;
 }
 
-function fetchWikipediaSummary($scientificName) {
-    $url = 'https://en.wikipedia.org/api/rest_v1/page/summary/' . urlencode($scientificName);
-    $response = curl_get($url);
-    if ($response === false) return null;
-    $data = json_decode($response, true);
-    if (isset($data['extract'])) return $data['extract'];
-    return null;
-}
-
-function fetchWikipediaImages($scientificName) {
-    $url = 'https://en.wikipedia.org/w/api.php?action=query&titles=' . urlencode($scientificName) . '&prop=images&format=json&imlimit=10&origin=*';
-    $response = curl_get($url);
-    if ($response === false) return [];
-    $data = json_decode($response, true);
-    $images = [];
-    if (isset($data['query']['pages'])) {
-        foreach ($data['query']['pages'] as $page) {
-            if (isset($page['images'])) {
-                foreach ($page['images'] as $img) {
-                    $imgTitle = $img['title'];
-                    if (preg_match('/\.(jpg|jpeg|png)$/i', $imgTitle)) {
-                        $images[] = $imgTitle;
+// Handle file upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_FILES['plant_image']) && $_FILES['plant_image']['error'] === UPLOAD_ERR_OK) {
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        $fileType = mime_content_type($_FILES['plant_image']['tmp_name']);
+        
+        if (!in_array($fileType, $allowedTypes)) {
+            $error = 'Only JPG and PNG files are allowed.';
+        } else {
+            // Create uploads directory if it doesn't exist
+            $uploadDir = 'uploads/';
+            if (!file_exists($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+            
+            // Generate unique filename
+            $fileName = uniqid('plant_') . '_' . basename($_FILES['plant_image']['name']);
+            $targetPath = $uploadDir . $fileName;
+            
+            // Move uploaded file
+            if (move_uploaded_file($_FILES['plant_image']['tmp_name'], $targetPath)) {
+                // Call Plant.id API
+                $result = identifyPlant($targetPath);
+                
+                if (isset($result['error'])) {
+                    $error = $result['error'];
+                    @unlink($targetPath); // Remove uploaded file on error
+                } else {
+                    // Save to database
+                    try {
+                        $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
+                        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                        
+                        $plantName = $result['suggestions'][0]['plant_name'] ?? 'Unknown Plant';
+                        
+                        $stmt = $pdo->prepare("INSERT INTO identifications (user_id, image_path, plant_name, result_json, created_at) VALUES (?, ?, ?, ?, NOW())");
+                        $stmt->execute([
+                            $_SESSION['user_id'],
+                            $targetPath,
+                            $plantName,
+                            json_encode($result)
+                        ]);
+                        
+                        $identificationId = $pdo->lastInsertId();
+                        
+                        // Redirect to identification result page
+                        header("Location: identification.php?id=" . $identificationId);
+                        exit();
+                        
+                    } catch (PDOException $e) {
+                        $error = 'Database error: ' . $e->getMessage();
+                        @unlink($targetPath); // Remove uploaded file on error
                     }
                 }
+            } else {
+                $error = 'Failed to upload file.';
             }
         }
+    } else {
+        $error = 'Please select an image file to upload.';
     }
+}
+
+// Include header and sidebar
+$pageTitle = 'Identify Plant';
+include 'includes/header.php';
+?>
+
+<div class="container">
+    <h1><i class="fas fa-search"></i> Identify a Plant</h1>
+    
+    <?php if (!empty($error)): ?>
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?>
+        </div>
+    <?php endif; ?>
+    
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="upload-container">
+                        <div class="text-center mb-4">
+                            <i class="fas fa-leaf fa-5x text-success mb-3"></i>
+                            <h3>Upload Plant Image</h3>
+                            <p class="text-muted">Take a photo or upload an image of a plant to identify it</p>
+                        </div>
+                        
+                        <form id="plantForm" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+                            <div class="form-group">
+                                <div class="custom-file">
+                                    <input type="file" class="custom-file-input" id="plantImage" name="plant_image" accept="image/*" capture="camera" required>
+                                    <label class="custom-file-label" for="plantImage">Choose file or take a photo</label>
+                                    <div class="invalid-feedback">
+                                        Please select an image file.
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center mt-4">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-search"></i> Identify Plant
+                                </button>
+                            </div>
+                        </form>
+                        
+                        <div class="image-preview mt-4 text-center" id="imagePreview" style="display: none;">
+                            <img src="#" alt="Preview" class="img-thumbnail" id="previewImage" style="max-height: 300px;">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="tips-container p-4">
+                        <h4><i class="fas fa-lightbulb text-warning"></i> Tips for Better Results</h4>
+                        <ul class="list-unstyled">
+                            <li class="mb-2"><i class="fas fa-check-circle text-success"></i> Take clear, well-lit photos of leaves, flowers, or fruits</li>
+                            <li class="mb-2"><i class="fas fa-check-circle text-success"></i> Ensure the plant fills most of the frame</li>
+                            <li class="mb-2"><i class="fas fa-check-circle text-success"></i> Avoid blurry or distant shots</li>
+                            <li class="mb-2"><i class="fas fa-check-circle text-success"></i> Take multiple photos from different angles</li>
+                        </ul>
+                        
+                        <div class="mt-4">
+                            <h5>Recently Identified Plants</h5>
+                            <div class="recent-plants">
+                                <?php
+                                try {
+                                    $pdo = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
+                                    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                                    
+                                    $stmt = $pdo->prepare("SELECT * FROM identifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 3");
+                                    $stmt->execute([$_SESSION['user_id']]);
+                                    $recentPlants = $stmt->fetchAll();
+                                    
+                                    if (count($recentPlants) > 0) {
+                                        echo '<div class="row">';
+                                        foreach ($recentPlants as $plant) {
+                                            $plantData = json_decode($plant['result_json'], true);
+                                            $plantName = $plantData['suggestions'][0]['plant_name'] ?? 'Unknown Plant';
+                                            echo '<div class="col-4 mb-3">';
+                                            echo '<a href="identification.php?id=' . $plant['id'] . '" class="text-decoration-none">';
+                                            echo '<img src="' . htmlspecialchars($plant['image_path']) . '" class="img-fluid rounded" style="height: 80px; width: 100%; object-fit: cover;">';
+                                            echo '<small class="d-block text-center text-dark mt-1">' . htmlspecialchars(substr($plantName, 0, 15)) . (strlen($plantName) > 15 ? '...' : '') . '</small>';
+                                            echo '</a></div>';
+                                        }
+                                        echo '</div>';
+                                    } else {
+                                        echo '<p class="text-muted">No recent identifications found.</p>';
+                                    }
+                                } catch (PDOException $e) {
+                                    echo '<p class="text-muted">Unable to load recent plants.</p>';
+                                }
+                                ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.upload-container {
+    padding: 2rem;
+    border: 2px dashed #dee2e6;
+    border-radius: 10px;
+    background-color: #f8f9fa;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.upload-container:hover {
+    border-color: #28a745;
+    background-color: #f1f8ff;
+}
+
+.tips-container {
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    height: 100%;
+}
+
+.custom-file-label::after {
+    content: "Browse";
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    margin-bottom: 2rem;
+}
+
+.alert {
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+}
+</style>
+
+<script>
+// Show image preview when file is selected
+document.getElementById('plantImage').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('previewImage');
+            preview.src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+        }
+        reader.readAsDataURL(file);
+        document.querySelector('.custom-file-label').textContent = file.name;
+    }
+});
+
+// Form validation
+(function() {
+    'use strict';
+    window.addEventListener('load', function() {
+        var forms = document.getElementsByClassName('needs-validation');
+        var validation = Array.prototype.filter.call(forms, function(form) {
+            form.addEventListener('submit', function(event) {
+                if (form.checkValidity() === false) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                }
+                form.classList.add('was-validated');
+            }, false);
+        });
+    }, false);
+})();
+</script>
+
+<?php
+// Include footer
+include 'includes/footer.php';
+?>
     // Get image URLs
     $urls = [];
     foreach ($images as $imgTitle) {

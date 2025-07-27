@@ -27,7 +27,8 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <ul style="display: flex; list-style: none; gap: 1.5rem;">
                         <li><a href="/Plant-AI/index.php" class="<?php echo $current_page === 'index.php' ? 'active' : ''; ?>">Home</a></li>
                         <li><a href="/Plant-AI/disease_detect.php" class="<?php echo $current_page === 'disease_detect.php' ? 'active' : ''; ?>">Disease Detection</a></li>
-                        <li><a href="/Plant-AI/plant_database.php" class="<?php echo $current_page === 'plant_database.php' ? 'active' : ''; ?>">Plant Database</a></li>
+                        <li><a href="/Plant-AI/identify.php" class="<?php echo $current_page === 'identify.php' ? 'active' : ''; ?>">Identify Plant</a></li>
+                        <li><a href="/Plant-AI/identification.php" class="<?php echo $current_page === 'identification.php' ? 'active' : ''; ?>">My Identifications</a></li>
                         <?php if (isset($_SESSION['user_id'])): ?>
                             <li><a href="/Plant-AI/dashboard.php">My Dashboard</a></li>
                             <li><a href="/Plant-AI/logout.php">Logout</a></li>

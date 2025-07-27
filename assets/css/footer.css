@@ -2,9 +2,9 @@
 footer {
     background-color: #2e7d32;
     color: white;
-    padding: 2rem 0;
-    margin-top: 3rem;
-    width: 100%;
+    padding: 1.2rem 0;
+    margin-top: 2rem;
+    font-size: 0.9rem;
 }
 
 .footer-container {
@@ -14,35 +14,38 @@ footer {
     display: flex;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 2rem;
+    gap: 1.2rem;
 }
 
 .footer-section {
     flex: 1;
-    min-width: 200px;
+    min-width: 160px;
+    margin-bottom: 0.8rem;
 }
 
 .footer-section h3 {
     color: #fff;
-    margin-bottom: 1rem;
-    font-size: 1.2rem;
+    margin: 0 0 0.6rem 0;
+    font-size: 1.1rem;
 }
 
 .footer-section p {
     color: #e0e0e0;
-    line-height: 1.6;
+    line-height: 1.4;
+    margin: 0.3rem 0;
+    font-size: 0.85rem;
 }
 
 .social-links {
-    margin-top: 1rem;
+    margin: 0.6rem 0;
     display: flex;
-    gap: 1rem;
+    gap: 0.8rem;
 }
 
 .social-links a {
     color: white;
-    font-size: 1.2rem;
-    transition: color 0.3s ease;
+    font-size: 1.1rem;
+    transition: color 0.2s ease;
 }
 
 .social-links a:hover {
@@ -56,43 +59,46 @@ footer {
 }
 
 .footer-links li {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.4rem;
 }
 
 .footer-links a {
     color: #e0e0e0;
     text-decoration: none;
-    transition: color 0.3s ease;
+    font-size: 0.9rem;
+    transition: color 0.2s ease;
 }
 
 .footer-links a:hover {
     color: #a5d6a7;
-    text-decoration: underline;
+    text-decoration: none;
 }
 
 .newsletter-form {
-    margin-top: 1rem;
+    margin: 0.6rem 0 0 0;
     display: flex;
     gap: 0.5rem;
 }
 
 .newsletter-form input[type="email"] {
-    padding: 0.5rem;
+    padding: 0.4rem 0.6rem;
     border: 1px solid #e0e0e0;
     border-radius: 4px;
     flex-grow: 1;
     min-width: 0;
+    font-size: 0.9rem;
 }
 
 .newsletter-form .btn {
     white-space: nowrap;
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 0.8rem;
     background-color: #388e3c;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
 }
 
 .newsletter-form .btn:hover {
@@ -100,11 +106,11 @@ footer {
 }
 
 .footer-bottom {
-    margin-top: 2rem;
-    padding-top: 1rem;
+    margin-top: 1.2rem;
+    padding-top: 0.8rem;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     text-align: center;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     color: #e0e0e0;
 }
 
@@ -112,11 +118,12 @@ footer {
 @media (max-width: 768px) {
     .footer-container {
         flex-direction: column;
-        gap: 1.5rem;
+        gap: 1.2rem;
     }
     
     .footer-section {
         width: 100%;
+        margin-bottom: 0;
     }
     
     .newsletter-form {
@@ -125,5 +132,6 @@ footer {
     
     .newsletter-form .btn {
         width: 100%;
+        margin-top: 0.4rem;
     }
 }

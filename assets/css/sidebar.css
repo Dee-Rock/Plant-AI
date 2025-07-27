@@ -51,12 +51,39 @@
 .sidebar-menu {
     padding: 20px 0;
     margin: 0;
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 60px); /* Subtract header height */
 }
 
-.sidebar-menu ul {
+.top-menu {
     list-style: none;
     padding: 0;
     margin: 0;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.bottom-menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-top: 1px solid #34495e;
+    padding-top: 10px;
+}
+
+/* Logout button styling */
+.logout-btn {
+    color: #e74c3c !important;
+    border-radius: 4px;
+    margin: 10px 15px 0;
+    background-color: rgba(231, 76, 60, 0.1) !important;
+    transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+    background-color: rgba(231, 76, 60, 0.2) !important;
+    color: #fff !important;
 }
 
 .sidebar-menu li {

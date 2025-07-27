@@ -292,3 +292,12 @@ $identifications = $stmt->fetchAll();
     
     <!-- Include Footer -->
     <?php include 'includes/footer_include.php'; ?>
+    
+    <!-- Include JavaScript files -->
+    <script src="assets/js/main.js"></script>
+    <script>
+        // Add your gallery-specific JavaScript here
+        document.addEventListener('DOMContentLoaded', function() {
+            // Any gallery-specific initialization code
+        });
+    </script>
